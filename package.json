@@ -1,6 +1,6 @@
 {
   "name": "confd-template",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "a `cli` for generating [confd](https://github.com/kelseyhightower/confd) templates using a populated KV backend",
   "main": "index.js",
   "scripts": {
