@@ -1,12 +1,10 @@
 package cmd
 
 import (
-	"confd-template/backend"
-	"confd-template/render"
-	ssmbackend "confd-template/ssm"
+	ssmbackend "confd-template/backend/ssm"
+	"confd-template/engine/yaml"
 	"confd-template/template"
 	"confd-template/validation"
-	"confd-template/yaml"
 	"fmt"
 	"os"
 	"strings"
@@ -27,67 +25,24 @@ var (
 	prefix      string
 )
 
+// define cli entrypoint
 var rootCmd = &cobra.Command{
 	Use:   "confd-template",
 	Short: "a cli for generating confd templates using a populated KV backend",
 	Run: func(cmd *cobra.Command, args []string) {
-		switch strings.ToLower(strings.TrimSpace(loglevel)) {
-		case "debug":
-			logrus.SetLevel(logrus.DebugLevel)
-		case "info":
-			logrus.SetLevel(logrus.InfoLevel)
-		case "warn":
-			logrus.SetLevel(logrus.WarnLevel)
-		case "error":
-			logrus.SetLevel(logrus.ErrorLevel)
-		default:
-			logrus.SetLevel(logrus.InfoLevel)
-		}
+		configureLogging()
 
-		// define template
-		t := &template.Template{
-			Delimiter: delimiter,
-			Filter:    filter,
-			Format:    format,
-			Outfile:   outfile,
-			Prefix:    prefix,
-		}
-		if err := validation.Validate.Struct(t); err != nil {
-			panic(err)
-		}
-
-		// backend
-		var b backend.Backend
-		var err error
-		switch backendtype {
-		case "ssm":
-			sess := session.Must(session.NewSession())
-			svc := ssm.New(sess)
-			b, err = ssmbackend.New(&ssmbackend.Config{
-				Logger: logrus.StandardLogger(),
-				SSM:    svc,
-			})
-			if err != nil {
-				logrus.WithError(err).Fatalln("error creating ssm backend")
-			}
-		default:
-			logrus.Fatalf("unsupported backend type: %s", backendtype)
-		}
-
-		// renderer
-		var r render.Renderer
-		switch format {
-		case "yaml":
-			r, err = yaml.NewRenderer(&yaml.Config{
-				Backend:  b,
-				Logger:   logrus.StandardLogger(),
-				Template: t,
-			})
-			if err != nil {
-				logrus.WithError(err).Fatalln("error creating renderer")
-			}
-		default:
-			logrus.Fatalf("unsupported renderer format: %s", format)
+		t := loadTemplate()
+		b := loadBackend()
+		e := loadEngine(t)
+		r, err := template.NewRenderer(&template.Config{
+			Backend:  b,
+			Engine:   e,
+			Logger:   logrus.StandardLogger(),
+			Template: t,
+		})
+		if err != nil {
+			logrus.WithError(err).Fatalln("error creating renderer...")
 		}
 
 		// render template
@@ -114,4 +69,77 @@ func Execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+// configureLogging configures logging format and verbosity
+func configureLogging() {
+	// set log verbosity
+	switch strings.ToLower(strings.TrimSpace(loglevel)) {
+	case "debug":
+		logrus.SetLevel(logrus.DebugLevel)
+	case "info":
+		logrus.SetLevel(logrus.InfoLevel)
+	case "warn":
+		logrus.SetLevel(logrus.WarnLevel)
+	case "error":
+		logrus.SetLevel(logrus.ErrorLevel)
+	default:
+		logrus.SetLevel(logrus.InfoLevel)
+	}
+}
+
+// loadBackend creates and validates a new backend value
+func loadBackend() template.Backend {
+	var b template.Backend
+	var err error
+	switch backendtype {
+	case "ssm":
+		sess := session.Must(session.NewSession())
+		svc := ssm.New(sess)
+		b, err = ssmbackend.New(&ssmbackend.Config{
+			Logger: logrus.StandardLogger(),
+			SSM:    svc,
+		})
+		if err != nil {
+			logrus.WithError(err).Fatalln("error creating ssm backend")
+		}
+	default:
+		logrus.Fatalf("unsupported backend type: %s", backendtype)
+	}
+	return b
+}
+
+// loadEngine creates and loads formatting engine
+func loadEngine(t *template.Template) template.Engine {
+	var e template.Engine
+	var err error
+	switch format {
+	case "yaml":
+		e, err = yaml.New(&yaml.Config{
+			Logger:   logrus.StandardLogger(),
+			Template: t,
+		})
+		if err != nil {
+			logrus.WithError(err).Fatalln("error creating renderer")
+		}
+	default:
+		logrus.Fatalf("unsupported renderer format: %s", format)
+	}
+	return e
+}
+
+// loadTemplate creates and validates a new template value
+func loadTemplate() *template.Template {
+	// define template
+	t := &template.Template{
+		Delimiter: delimiter,
+		Filter:    filter,
+		Format:    format,
+		Outfile:   outfile,
+		Prefix:    prefix,
+	}
+	if err := validation.Validate.Struct(t); err != nil {
+		logrus.WithError(err).Fatalln("error loading template...")
+	}
+	return t
 }

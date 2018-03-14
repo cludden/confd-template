@@ -1,11 +1,9 @@
 package ssm
 
 import (
-	"confd-template/backend"
 	"confd-template/template"
 	"confd-template/validation"
 	"context"
-	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ssm"
@@ -15,7 +13,7 @@ import (
 
 // Backend provides access to a KV store backed by SSM
 type Backend struct {
-	keys chan *backend.Key
+	keys chan *template.Key
 	log  logrus.FieldLogger
 	svc  ssmiface.SSMAPI
 }
@@ -26,7 +24,7 @@ func New(c *Config) (*Backend, error) {
 		return nil, err
 	}
 	b := &Backend{
-		keys: make(chan *backend.Key, 500),
+		keys: make(chan *template.Key, 500),
 		log:  c.Logger,
 		svc:  c.SSM,
 	}
@@ -34,7 +32,7 @@ func New(c *Config) (*Backend, error) {
 }
 
 // Keys returns a buffered channel of keys
-func (b *Backend) Keys(t *template.Template) chan *backend.Key {
+func (b *Backend) Keys(t *template.Template) chan *template.Key {
 	go b.streamKeys(t)
 	return b.keys
 }
@@ -53,7 +51,7 @@ func (b *Backend) streamKeys(t *template.Template) {
 	// define parameter page handler
 	handler := func(output *ssm.GetParametersByPathOutput, last bool) bool {
 		for _, p := range output.Parameters {
-			b.keys <- &backend.Key{
+			b.keys <- &template.Key{
 				Name:  *p.Name,
 				Value: *p.Value,
 			}
@@ -64,11 +62,10 @@ func (b *Backend) streamKeys(t *template.Template) {
 	// process all parameters until there are no parameters left to process
 	if err := b.svc.GetParametersByPathPagesWithContext(context.Background(), params, handler); err != nil {
 		b.log.WithError(err).Errorln("ssm error detected")
-		b.keys <- &backend.Key{
+		b.keys <- &template.Key{
 			Error: err,
 		}
 	}
-	fmt.Println("closing channel...")
 	close(b.keys)
 }
 

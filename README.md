@@ -19,15 +19,13 @@ Flags:
       --prefix string      key prefix to scan (default "/")
 ```
 
-## Quick Start
+## Getting Started
 Basic cli usage is shown below. This will use the default backend (ssm) and render format (yaml) to output a confd template containing all of the keys at prefix "/secrets/production-us-east-1" that begin with "/foo/" or "/bar/".
 ```
 $ confd-template --level debug --out config.yml.tmpl --prefix /secrets/production-us-east-1 --filter "^/(foo|bar)/*"
 ```
 
 ## Installation
-
-### Binary Download
 
 You can download the latest release from [GitHub](https://github.com/cludden/confd-template/releases)
 
@@ -42,13 +40,13 @@ $ chmod +x /usr/local/bin/confd-template
 ```
 
 ## Todo
-General:
+**General:**
 - [ ] test test test
 
-Backends:
+**Backends:**
 - [x] ssm
 
-Formatters:
+**Formatters:**
 - [x] yaml
 - [ ] json
 
