@@ -21,6 +21,7 @@ var (
 	filter      string
 	format      string
 	loglevel    string
+	optional    bool
 	outfile     string
 	prefix      string
 )
@@ -59,6 +60,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&filter, "filter", "", "optional regex key filter")
 	rootCmd.PersistentFlags().StringVar(&format, "format", "yaml", "template format")
 	rootCmd.PersistentFlags().StringVar(&loglevel, "level", "info", "log level")
+	rootCmd.PersistentFlags().BoolVar(&optional, "optional", false, "wrap template interpolations with conditional wrapper`")
 	rootCmd.PersistentFlags().StringVar(&outfile, "out", "", "output template path")
 	rootCmd.PersistentFlags().StringVar(&prefix, "prefix", "/", "key prefix to scan")
 }
@@ -117,6 +119,7 @@ func loadEngine(t *template.Template) template.Engine {
 	case "yaml":
 		e, err = yaml.New(&yaml.Config{
 			Logger:   logrus.StandardLogger(),
+			Optional: optional,
 			Template: t,
 		})
 		if err != nil {

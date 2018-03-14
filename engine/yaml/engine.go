@@ -15,6 +15,7 @@ import (
 // Engine manages rendering a single confd yaml template
 type Engine struct {
 	log      logrus.FieldLogger
+	optional bool
 	template *template.Template
 }
 
@@ -28,8 +29,10 @@ func New(c *Config) (*Engine, error) {
 	// create new renderer value
 	e := &Engine{
 		log:      c.Logger,
+		optional: c.Optional,
 		template: c.Template,
 	}
+
 	return e, nil
 }
 
@@ -83,11 +86,24 @@ func (e *Engine) appendKey(data map[string]interface{}, key *template.Key) error
 		container = c
 	}
 
-	if isJSON(key.Value) {
-		container[last] = fmt.Sprintf("{{ getv \"%s\" }}", key.Name)
-	} else {
-		container[last] = fmt.Sprintf("\"{{ getv \"%s\" }}\"", key.Name)
+	var prefix string
+	var suffix string
+	var format string
+
+	// if value is not a JSON scalar or stringified data structure, wrap in quotes
+	if !isJSON(key.Value) {
+		prefix = "\""
+		suffix = "\""
 	}
+
+	if e.optional {
+		format = fmt.Sprintf("{{ getv \"%s\" \"null\" }}", key.Name)
+	} else {
+		format = fmt.Sprintf("{{ getv \"%s\" }}", key.Name)
+	}
+
+	// add key interpolation to container
+	container[last] = fmt.Sprintf("%s%s%s", prefix, format, suffix)
 
 	return nil
 }
@@ -116,6 +132,7 @@ func (e *Engine) render(data map[string]interface{}, i int) ([]byte, error) {
 // Config defines the input to a NewRenderer operation
 type Config struct {
 	Logger   logrus.FieldLogger `validate:"required"`
+	Optional bool               `validate:"required"`
 	Template *template.Template `validate:"required"`
 }
 
